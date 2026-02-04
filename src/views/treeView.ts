@@ -3,6 +3,7 @@ import * as path from "path";
 import { Migration } from "../models/migration";
 import { MigrationScanner } from "../migrations/scanner";
 import { MigrationParser } from "../migrations/parser";
+import { DbConnectionService } from "../services/DbConnectionService";
 
 export class KnexMigrationProvider implements vscode.TreeDataProvider<MigrationTreeItem> {
   private _onDidChangeTreeData: vscode.EventEmitter<
@@ -39,10 +40,20 @@ export class KnexMigrationProvider implements vscode.TreeDataProvider<MigrationT
     const files = await this.scanner.scan();
     const items: MigrationTreeItem[] = [];
 
+    // Fetch DB status (if connected)
+    const executed = await DbConnectionService.getExecutedMigrations();
+
     for (const file of files) {
       try {
         const migration = await this.parser.parse(file);
-        items.push(new MigrationTreeItem(migration));
+
+        // Determine status
+        const fileName = path.basename(file);
+        const isExecuted =
+          executed.has(fileName) ||
+          executed.has(fileName.replace(".ts", ".js"));
+
+        items.push(new MigrationTreeItem(migration, isExecuted));
       } catch (e) {
         this.outputChannel.appendLine(
           `Failed to parse migration ${file}: ${e}`,
@@ -55,7 +66,10 @@ export class KnexMigrationProvider implements vscode.TreeDataProvider<MigrationT
 }
 
 export class MigrationTreeItem extends vscode.TreeItem {
-  constructor(public readonly migration: Migration) {
+  constructor(
+    public readonly migration: Migration,
+    private readonly isExecuted: boolean,
+  ) {
     super(migration.name, vscode.TreeItemCollapsibleState.None);
 
     this.tooltip = `${migration.timestamp} - ${migration.path}`;
@@ -65,8 +79,12 @@ export class MigrationTreeItem extends vscode.TreeItem {
     if (!migration.hasDown) {
       this.iconPath = new vscode.ThemeIcon("warning");
       this.tooltip += " (Missing down method)";
+    } else if (this.isExecuted) {
+      this.iconPath = new vscode.ThemeIcon("pass");
+      this.tooltip += " (Executed)";
     } else {
-      this.iconPath = new vscode.ThemeIcon("check");
+      this.iconPath = new vscode.ThemeIcon("circle-large-outline");
+      this.tooltip += " (Pending)";
     }
 
     this.command = {

@@ -118,6 +118,8 @@ export class DbConnectionService {
             );
           }
 
+          // Clear cache to ensure we get fresh config if file changed or env vars changed
+          delete require.cache[require.resolve(p)];
           const config = require(p);
           return config.development || config;
         } catch (e) {
@@ -140,7 +142,8 @@ export class DbConnectionService {
     const dotenvPath = path.join(projectRoot, ".env");
     if (fs.existsSync(dotenvPath)) {
       this.log(`Pre-loading .env from ${dotenvPath}`);
-      require("dotenv").config({ path: dotenvPath });
+      // Force reload env vars to pick up changes
+      require("dotenv").config({ path: dotenvPath, override: true });
     }
   }
 

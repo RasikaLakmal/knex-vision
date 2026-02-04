@@ -45,9 +45,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register refresh command
   context.subscriptions.push(
-    vscode.commands.registerCommand("knex-vision.refresh", () =>
-      migrationProvider.refresh(),
-    ),
+    vscode.commands.registerCommand("knex-vision.refresh", async () => {
+      // Force reconnect to pick up config changes
+      await DbConnectionService.close();
+      if (
+        vscode.workspace.workspaceFolders &&
+        vscode.workspace.workspaceFolders.length > 0
+      ) {
+        const root = vscode.workspace.workspaceFolders[0].uri.fsPath;
+        await DbConnectionService.connect(root);
+      }
+      migrationProvider.refresh();
+    }),
   );
 
   // Register preview command

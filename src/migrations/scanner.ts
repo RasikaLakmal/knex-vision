@@ -12,12 +12,13 @@ export class MigrationScanner {
     // We look for .ts and .js files in a 'migrations' folder anywhere in the workspace
     const files = await vscode.workspace.findFiles(
       "**/migrations/*.{ts,js}",
-      "**/node_modules/**",
+      "**/{node_modules,dist,out,build}/**",
     );
 
-    // Convert to absolute paths and sort
+    // Convert to absolute paths, filter definition files, and sort
     const filePaths = files
       .map((uri) => uri.fsPath)
+      .filter((p) => !p.endsWith(".d.ts"))
       .sort((a, b) => {
         const nameA = path.basename(a);
         const nameB = path.basename(b);
