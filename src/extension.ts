@@ -1,26 +1,73 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
+import { KnexMigrationProvider } from "./views/treeView";
+import { MigrationPreviewPanel } from "./panels/MigrationPreviewPanel";
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+import { MigrationParser } from "./migrations/parser";
+import { MigrationService } from "./services/MigrationService";
+import * as path from "path";
+
 export function activate(context: vscode.ExtensionContext) {
+  console.log("Knex Vision is active!");
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "knex-vision" is now active!');
+  const migrationProvider = new KnexMigrationProvider();
+  vscode.window.registerTreeDataProvider(
+    "knex-vision-migrations",
+    migrationProvider,
+  );
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('knex-vision.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from knex-vision!');
-	});
+  // Register refresh command
+  context.subscriptions.push(
+    vscode.commands.registerCommand("knex-vision.refresh", () =>
+      migrationProvider.refresh(),
+    ),
+  );
 
-	context.subscriptions.push(disposable);
+  // Register preview command
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "knex-vision.preview",
+      async (uri: vscode.Uri) => {
+        let targetUri = uri;
+        if (!targetUri && vscode.window.activeTextEditor) {
+          targetUri = vscode.window.activeTextEditor.document.uri;
+        }
+
+        if (targetUri) {
+          try {
+            const parser = new MigrationParser();
+            const migration = await parser.parse(targetUri.fsPath);
+
+            // Find related migrations
+            const tableNames: string[] = [];
+            if (migration.diff && migration.diff.tables) {
+              migration.diff.tables.forEach((t) =>
+                tableNames.push(t.tableName),
+              );
+            }
+
+            // dedupe
+            const uniqueTables = Array.from(new Set(tableNames));
+
+            const service = new MigrationService();
+            const dir = path.dirname(targetUri.fsPath);
+            const related = await service.findRelatedMigrations(
+              targetUri.fsPath,
+              uniqueTables,
+              dir,
+            );
+
+            migration.related = related;
+
+            MigrationPreviewPanel.render(context.extensionUri, migration);
+          } catch (e) {
+            vscode.window.showErrorMessage(`Failed to parse migration: ${e}`);
+          }
+        } else {
+          vscode.window.showWarningMessage("No migration file selected.");
+        }
+      },
+    ),
+  );
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}

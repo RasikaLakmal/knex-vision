@@ -1,23 +1,56 @@
 {
   "name": "knex-vision",
+  "publisher": "knex-vision",
   "displayName": "knex-vision",
   "description": "A VS Code extension to inspect, visualize, and validate Knex.js migrations.",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.108.1"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:knex-vision-migrations"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "knex-vision-migrations",
+          "name": "Knex Migrations"
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "knex-vision.helloWorld",
-        "title": "Hello World"
+        "command": "knex-vision.refresh",
+        "title": "Refresh Migrations",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "knex-vision.preview",
+        "title": "Preview Migration",
+        "icon": "$(preview)"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "knex-vision.refresh",
+          "when": "view == knex-vision-migrations",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "knex-vision.preview",
+          "when": "view == knex-vision-migrations",
+          "group": "inline"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -34,15 +67,18 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.108.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.52.0",
-    "eslint": "^9.39.2",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.27.2",
+    "eslint": "^9.39.2",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.52.0"
+  },
+  "dependencies": {
+    "ts-morph": "^27.0.2"
   }
 }
