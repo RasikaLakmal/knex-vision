@@ -8,10 +8,13 @@ export class MigrationService {
     currentFilePath: string,
     tableNames: string[],
     migrationsDir: string,
+    includeCurrent: boolean = false,
   ): Promise<
     { id: string; name: string; path: string; tableNames: string[] }[]
   > {
-    if (tableNames.length === 0) return [];
+    if (tableNames.length === 0) {
+      return [];
+    }
 
     const related: {
       id: string;
@@ -24,13 +27,15 @@ export class MigrationService {
     try {
       const files = await fs.promises.readdir(migrationsDir);
 
-      // Filter out current file and non-ts/js
+      // Filter out non-ts/js
       const candidates = files.filter((f) => {
         const fullPath = path.join(migrationsDir, f);
-        return (
-          fullPath !== currentFilePath &&
-          (f.endsWith(".ts") || f.endsWith(".js"))
-        );
+        const isCurrent = fullPath === currentFilePath;
+        if (!includeCurrent && isCurrent) {
+          return false;
+        }
+
+        return f.endsWith(".ts") || f.endsWith(".js");
       });
 
       // Fast text search

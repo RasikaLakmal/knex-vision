@@ -14,10 +14,13 @@ export class KnexMigrationProvider implements vscode.TreeDataProvider<MigrationT
 
   private scanner: MigrationScanner;
   private parser: MigrationParser;
+  private outputChannel: vscode.OutputChannel;
 
   constructor() {
     this.scanner = new MigrationScanner();
     this.parser = new MigrationParser();
+    // Initialize output channel
+    this.outputChannel = vscode.window.createOutputChannel("Knex Vision");
   }
 
   refresh(): void {
@@ -41,7 +44,9 @@ export class KnexMigrationProvider implements vscode.TreeDataProvider<MigrationT
         const migration = await this.parser.parse(file);
         items.push(new MigrationTreeItem(migration));
       } catch (e) {
-        console.error(`Failed to parse migration ${file}:`, e);
+        this.outputChannel.appendLine(
+          `Failed to parse migration ${file}: ${e}`,
+        );
       }
     }
 

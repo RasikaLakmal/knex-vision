@@ -10,9 +10,6 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onView:knex-vision-migrations"
-  ],
   "main": "./dist/extension.js",
   "contributes": {
     "views": {
@@ -50,6 +47,45 @@
           "group": "inline"
         }
       ]
+    },
+    "configuration": {
+      "title": "Knex Vision",
+      "properties": {
+        "knexVision.database.client": {
+          "type": "string",
+          "default": "pg",
+          "description": "Database client (pg, mysql, etc.)"
+        },
+        "knexVision.database.connectionString": {
+          "type": "string",
+          "description": "Full database connection string URL"
+        },
+        "knexVision.database.host": {
+          "type": "string",
+          "description": "Database host"
+        },
+        "knexVision.database.port": {
+          "type": "number",
+          "description": "Database port"
+        },
+        "knexVision.database.user": {
+          "type": "string",
+          "description": "Database user"
+        },
+        "knexVision.database.password": {
+          "type": "string",
+          "description": "Database password"
+        },
+        "knexVision.database.database": {
+          "type": "string",
+          "description": "Database name"
+        },
+        "knexVision.database.ssl": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable SSL for database connection"
+        }
+      }
     }
   },
   "scripts": {
@@ -79,6 +115,9 @@
     "typescript-eslint": "^8.52.0"
   },
   "dependencies": {
+    "dotenv": "^17.2.3",
+    "knex": "^3.1.0",
+    "pg": "^8.18.0",
     "ts-morph": "^27.0.2"
   }
 }

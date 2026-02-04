@@ -1,13 +1,4 @@
-import {
-  Project,
-  SourceFile,
-  SyntaxKind,
-  Node,
-  StringLiteral,
-  TemplateExpression,
-  NoSubstitutionTemplateLiteral,
-  Identifier,
-} from "ts-morph";
+import { Project, SourceFile, SyntaxKind, Node } from "ts-morph";
 import * as path from "path";
 import { Migration, SchemaDiff } from "../models/migration";
 
@@ -17,6 +8,10 @@ export class MigrationParser {
   constructor() {
     this.project = new Project({
       skipAddingFilesFromTsConfig: true,
+      skipFileDependencyResolution: true, // Speed up parsing
+      compilerOptions: {
+        allowJs: true,
+      },
     });
   }
 
@@ -25,16 +20,7 @@ export class MigrationParser {
    * @param filePath Absolute path to the migration file
    */
   async parse(filePath: string): Promise<Migration> {
-    let sourceFile: SourceFile | undefined =
-      this.project.getSourceFile(filePath);
-    if (sourceFile) {
-      await sourceFile.refreshFromFileSystem();
-    } else {
-      sourceFile = this.project.addSourceFileAtPath(filePath);
-    }
-
-    // Refresh from disk to be sure (if cached)
-    await sourceFile.refreshFromFileSystem();
+    const sourceFile = this.project.addSourceFileAtPath(filePath);
 
     const fileName = path.basename(filePath);
     // Assuming format: YYYYMMDDHHMMSS_name.ts
@@ -93,8 +79,6 @@ export class MigrationParser {
       rawSql: string;
     }[] = [];
 
-    // Naively look for processing calls
-    // knex.schema.createTable('users', (table) => { ... })
     const callExpressions = upNode.getDescendantsOfKind(
       SyntaxKind.CallExpression,
     );
@@ -139,8 +123,6 @@ export class MigrationParser {
           if (rawContent) {
             rawSqls.push(rawContent);
 
-            // Attempt to parse CREATE INDEX (and UNIQUE)
-            // CREATE [UNIQUE] INDEX [IF NOT EXISTS] index_name ON table_name (col1, col2) ...
             const indexMatch = rawContent.match(
               /CREATE\s+(UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s+ON\s+(\w+)\s*\(([^)]+)\)/i,
             );
@@ -181,14 +163,16 @@ export class MigrationParser {
     type: string;
     changeType: "add" | "drop" | "alter";
     foreignKey?: { references: string; inTable: string };
+    isNullable?: boolean;
   }[] {
-    if (!callbackNode) return [];
+    if (!callbackNode) {return [];}
 
     const columns: {
       columnName: string;
       type: string;
       changeType: "add" | "drop" | "alter";
       foreignKey?: { references: string; inTable: string };
+      isNullable?: boolean;
     }[] = [];
 
     // We expect an ArrowFunction or FunctionExpression
@@ -196,13 +180,11 @@ export class MigrationParser {
     const func =
       callbackNode.asKind(SyntaxKind.ArrowFunction) ||
       callbackNode.asKind(SyntaxKind.FunctionExpression);
-    if (!func) return [];
+    if (!func) {return [];}
 
     const body = func.getBody();
-    if (!body) return [];
+    if (!body) {return [];}
 
-    // Iterate over statements to handle delegation/chaining
-    // table.uuid('user_id').references('id').inTable('users');
     let statements: Node[] = [];
     if (Node.isBlock(body)) {
       statements = body.getStatements();
@@ -217,26 +199,23 @@ export class MigrationParser {
     for (const statement of statements) {
       // We look for ExpressionStatements that are CallExpressions or chains of them
       const exprStmt = statement.asKind(SyntaxKind.ExpressionStatement);
-      if (!exprStmt) continue;
+      if (!exprStmt) {continue;}
 
       let currExpr = exprStmt.getExpression();
-
-      // Unwrap chains: .inTable().references().uuid()
-      // The AST structure for `a.b().c()` is Call(Expression: PropAccess(Expression: Call(Expression: PropAccess(Expression: a, Name: b)), Name: c))
-      // So the "outermost" text is the last function called.
 
       let columnName: string | undefined;
       let columnType: string | undefined;
       let references: string | undefined;
       let inTable: string | undefined;
-      let changeType: "add" | "drop" | "alter" = "add"; // default
+      let changeType: "add" | "drop" | "alter" = "add";
+      let isNullable: boolean = true; // Default to nullable in Knex unless specified
+      let isAlter = false;
 
-      // We traverse down the chain
       while (Node.isCallExpression(currExpr)) {
         const propAccess = currExpr
           .getExpression()
           .asKind(SyntaxKind.PropertyAccessExpression);
-        if (!propAccess) break;
+        if (!propAccess) {break;}
 
         const methodName = propAccess.getName();
         const args = currExpr.getArguments();
@@ -249,91 +228,53 @@ export class MigrationParser {
           inTable =
             this.resolveStringValue(args[0]) ||
             args[0].getText().replace(/['"`]/g, "");
+        } else if (methodName === "notNullable") {
+          isNullable = false;
+        } else if (methodName === "nullable") {
+          isNullable = true;
+        } else if (methodName === "primary") {
+          isNullable = false;
+        } else if (methodName === "alter") {
+          isAlter = true;
         } else if (
           methodName === "dropColumn" ||
           methodName === "dropColumns"
         ) {
-          changeType = "drop";
-          // For dropColumn, args are the names
-          args.forEach((arg) => {
-            const name =
-              this.resolveStringValue(arg) ||
-              arg.getText().replace(/['"`]/g, "");
-            columns.push({
-              columnName: name,
-              type: "unknown",
-              changeType: "drop",
-            });
-          });
-          // We handled this statement, break loop (assuming dropColumn doesn't chain meaningful adds)
-          columnName = undefined;
+          if (args.length > 0) {
+            columnName =
+              this.resolveStringValue(args[0]) ||
+              args[0].getText().replace(/['"`]/g, "");
+            changeType = "drop";
+            columnType = "unknown";
+          }
           break;
         } else if (methodName === "timestamps") {
+          // ... (keep existing timestamps logic)
           columns.push({
             columnName: "created_at",
             type: "timestamp",
             changeType: "add",
+            isNullable: false,
           });
           columns.push({
             columnName: "updated_at",
             type: "timestamp",
             changeType: "add",
+            isNullable: false,
           });
           columnName = undefined;
           break;
-        } else if (
-          methodName === "primary" ||
-          methodName === "index" ||
-          methodName === "unique"
-        ) {
-          // Constraints, skip for now or attach?
-          // Often table.primary([...]) - not a column def
+        } else if (methodName === "index" || methodName === "unique") {
+          // Constraints
         } else {
-          // Likely the column definition: table.string('name')
-          // It's usually the "base" of the chain, but we are traversing backwards from end of chain.
-          // So we keep going until we find the one called on 'table' (identifier)?
-          // Or we check if arg[0] is string.
-
-          // If we find a method that looks like a type def and has a string arg, assume it is the column.
+          // Likely the column definition
           if (!columnName && args.length > 0) {
-            // Check if it's the `table` object?
-            // propAccess.getExpression() is the object.
-            // If we are at `table.string('x')`, object is `table` (Identifier).
-            // If we are at `table.string('x').notNullable()`, object is `table.string('x')` (CallExpression).
-
-            // We prefer the 'deepest' one that has a string arg, which is likely the type def.
-            // But wait, `references('id')` also has string arg.
-            // We filtered ref/inTable.
-
-            // Heuristic: If we haven't found a column name yet, and this isn't a known modifier (notNullable, defaultTo),
-            // and references/inTable are already handled or this isn't them.
-
-            const ignored = [
-              "notNullable",
-              "nullable",
-              "defaultTo",
-              "unsigned",
-              "index",
-              "unique",
-              "primary",
-              "onDelete",
-              "onUpdate",
-            ];
+            const ignored = ["defaultTo", "unsigned", "onDelete", "onUpdate"];
             if (!ignored.includes(methodName)) {
               columnName =
                 this.resolveStringValue(args[0]) ||
                 args[0].getText().replace(/['"`]/g, "");
               columnType = methodName;
-
-              if (
-                parentType === "alter" &&
-                (methodName === "alter" || args.length === 0)
-              ) {
-                // Handle .alter()
-                // If explicit .alter() call exists in chain?
-                // Logic: in "alter" parentType, default is "add" unless we see known modification pattern?
-                // Knex: `table.string('x').alter()`
-              }
             }
           }
         }
@@ -342,16 +283,24 @@ export class MigrationParser {
         currExpr = propAccess.getExpression();
       }
 
-      // Check if we hit the `table` identifier at the bottom
-      // if (Node.isIdentifier(currExpr) && currExpr.getText() === 'table') { ... }
-
       if (columnName && columnType) {
+        let finalChangeType: "add" | "drop" | "alter" = "add";
+        if (changeType === "drop") {
+          finalChangeType = "drop";
+        } else if (parentType === "create") {
+          finalChangeType = "add";
+        } else {
+          // alterTable context
+          finalChangeType = isAlter ? "alter" : "add";
+        }
+
         columns.push({
           columnName,
           type: columnType,
-          changeType: parentType === "create" ? "add" : "alter",
+          changeType: finalChangeType,
           foreignKey:
             references && inTable ? { references, inTable } : undefined,
+          isNullable,
         });
       }
     }
@@ -416,15 +365,11 @@ export class MigrationParser {
 
     if (Node.isIdentifier(node)) {
       const definitions = node.getDefinitions();
-      // We can't easily jump to definition and get the node without referencing the AST.
-      // Better: use getDefinitionNodes() if available, or finding references.
-      // A safer, simpler strategy given we have the source file:
       const defs = node.getDefinitionNodes();
       for (const def of defs) {
         if (Node.isVariableDeclaration(def)) {
           const initializer = def.getInitializer();
           if (initializer) {
-            // Recursively resolve? For now, just 1 level deep.
             if (
               Node.isStringLiteral(initializer) ||
               Node.isNoSubstitutionTemplateLiteral(initializer)

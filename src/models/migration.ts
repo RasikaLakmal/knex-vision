@@ -8,6 +8,7 @@ export interface ColumnChange {
   type: string;
   changeType: "add" | "drop" | "alter";
   foreignKey?: ForeignKey;
+  isNullable?: boolean;
 }
 
 export interface SchemaInfo {
