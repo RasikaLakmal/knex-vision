@@ -1,9 +1,21 @@
 {
   "name": "knex-vision",
-  "publisher": "knex-vision",
-  "displayName": "knex-vision",
+  "publisher": "rasikalakmal",
+  "displayName": "Knex Vision",
   "description": "A VS Code extension to inspect, visualize, and validate Knex.js migrations.",
-  "version": "0.0.1",
+  "version": "0.1.0",
+  "author": {
+    "name": "Rasika Lakmal",
+    "url": "https://github.com/rasikalakmal"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rasikalakmal/knex-vision"
+  },
+  "bugs": {
+    "url": "https://github.com/rasikalakmal/knex-vision/issues"
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
