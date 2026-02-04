@@ -15,6 +15,7 @@
   "bugs": {
     "url": "https://github.com/rasikalakmal/knex-vision/issues"
   },
+  "homepage": "https://github.com/rasikalakmal/knex-vision#readme",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
@@ -23,6 +24,9 @@
     "Other"
   ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "views": {
       "explorer": [
