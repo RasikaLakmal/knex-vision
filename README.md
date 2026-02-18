@@ -1,5 +1,10 @@
 # Knex Vision
 
+[![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/rasikalakmal.knex-vision?style=flat-square&logo=visual-studio-code&label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=rasikalakmal.knex-vision)
+[![Visual Studio Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/rasikalakmal.knex-vision?style=flat-square&color=blue&label=Installs)](https://marketplace.visualstudio.com/items?itemName=rasikalakmal.knex-vision)
+[![Open VSX Version](https://img.shields.io/open-vsx/v/rasikalakmal/knex-vision?style=flat-square&logo=visual-studio-code&label=Open%20VSX)](https://open-vsx.org/extension/rasikalakmal/knex-vision)
+[![Open VSX Downloads](https://img.shields.io/open-vsx/dt/rasikalakmal/knex-vision?style=flat-square&color=blue&label=Downloads)](https://open-vsx.org/extension/rasikalakmal/knex-vision)
+
 **Knex Vision** is a VS Code extension designed to supercharge your Knex.js development workflow. Inspect, visualize, and validate your migrations without leaving your editor.
 
 ![Knex Vision Preview](https://github.com/rasikalakmal/knex-vision/raw/main/media/preview.gif)
